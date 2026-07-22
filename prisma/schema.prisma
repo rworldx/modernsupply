@@ -1,0 +1,87 @@
+// Modern Supply — database schema.
+// Dev: SQLite (zero-config, runs locally). Production: switch `provider` to
+// "postgresql" and point DATABASE_URL at Neon/Supabase, then re-run migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Live inventory row for each catalog product. Seeded from src/data/products.ts.
+// The static catalog stays the source of truth for names/units; this table adds
+// the mutable stock + availability that the admin controls and customers see.
+model Product {
+  id                String      @id // matches the static catalog id, e.g. "fill-biscuit-spread"
+  brandId           String
+  categoryId        String
+  nameEn            String
+  nameAr            String
+  unitEn            String
+  unitAr            String
+  stock             Int         @default(0)
+  lowStockThreshold Int         @default(10)
+  active            Boolean     @default(true) // false = delisted / discontinued (hidden from customers)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  orderItems        OrderItem[]
+
+  @@index([brandId])
+  @@index([categoryId])
+}
+
+// A customer order. No customer accounts — tracked by orderNumber + phone.
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique // human-friendly, e.g. "MS-2026-00042"
+  firstName       String
+  lastName        String
+  phone           String // Oman local number, 8 digits (no +968)
+  governorateEn   String
+  governorateAr   String
+  wilayatEn       String
+  wilayatAr       String
+  branchId        String // fulfilling branch (from src/data/brand.ts)
+  status          String      @default("pending") // pending|confirmed|preparing|out_for_delivery|delivered|cancelled
+  deliveryCompany String?
+  deliveryFee     Float? // OMR, set by admin
+  trackingNote    String? // free text shown to customer (e.g. "Driver: Ahmed, ETA 5pm")
+  adminNotes      String? // internal, not shown to customer
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+
+  @@index([phone])
+  @@index([status])
+}
+
+// Snapshot of a product at order time (names/units frozen so history is stable).
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  nameEn    String
+  nameAr    String
+  unitEn    String
+  unitAr    String
+  quantity  Int
+
+  @@index([orderId])
+}
+
+// Immutable audit log of stock changes (restocks, sales, manual edits).
+model StockMovement {
+  id        String   @id @default(cuid())
+  productId String
+  delta     Int // +restock, -sale/adjust
+  reason    String // "restock" | "order" | "manual" | "correction"
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}

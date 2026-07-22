@@ -1,0 +1,440 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* `dark:` follows the theme the user actually picked. Tailwind's default dark
+   variant is a `prefers-color-scheme` media query, which ignores the in-app
+   toggle — every `dark:` class in the app was silently stuck on the OS setting.
+   ThemeScript stamps data-theme before first paint, so this covers both. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ============================================================================
+   Modern Supply — design system
+   ---------------------------------------------------------------------------
+   Direction: Apple-style minimalism. Near-monochrome ink on white (#fff) and
+   Apple's own section gray (#f5f5f7); true black in dark mode. Colour is a
+   scarce resource: one accent (bronze, carried over from the brand) plus the
+   three semantic stock colours. Everything else is ink, gray and hairline.
+
+   Colour strategy: Restrained — tinted neutrals + one accent under ~10% of the
+   surface. The warmth of the business lives in the product photography and in
+   the brand marks, never in the body background.
+   ============================================================================ */
+
+@theme {
+  /* ---- Neutral ramp (chroma 0 in dark, a hair of blue-gray in light, the
+     way Apple's own grays sit) ------------------------------------------- */
+  --color-ink-950: #000000;
+  --color-ink-900: #1d1d1f;
+  --color-ink-800: #2c2c2e;
+  --color-ink-700: #38383a;
+  --color-ink-500: #6e6e73;
+  --color-ink-400: #86868b;
+  --color-ink-300: #a1a1a6;
+  --color-ink-200: #d2d2d7;
+  --color-ink-100: #e8e8ed;
+  --color-ink-50: #f5f5f7;
+  --color-ink-0: #ffffff;
+
+  /* ---- Accent: bronze. The brand's gold, pulled down to a lightness that
+     carries text on white without glowing. ------------------------------- */
+  --color-bronze-700: #6f5410;
+  --color-bronze-600: #8a6a12;
+  --color-bronze-500: #b08d2a;
+  --color-bronze-400: #d9b04a;
+  --color-bronze-300: #e3b341;
+
+  /* ---- Type -------------------------------------------------------------
+     SF on Apple hardware, Geist everywhere else. One family, four weights. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-geist),
+    system-ui, "Helvetica Neue", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    var(--font-geist), system-ui, "Helvetica Neue", sans-serif;
+  --font-arabic: "SF Arabic", var(--font-tajawal), var(--font-geist), sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, var(--font-geist-mono), Menlo, monospace;
+
+  /* ---- Radii. Apple's buttons are literally 980px; cards sit at 12–18. -- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 980px;
+
+  /* ---- Motion. Custom curves only; the built-in CSS easings are too weak
+     to read as intentional. ---------------------------------------------- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Durations, from fastest to slowest surface. Nothing interactive over 250ms. */
+  --duration-press: 120ms;
+  --duration-hover: 200ms;
+  --duration-pop: 200ms;
+  --duration-sheet: 350ms;
+
+  /* ---- Semantic z-index scale. No arbitrary values anywhere. ----------- */
+  --z-sticky: 40;
+  --z-overlay: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+
+  /* ---- Legacy aliases -------------------------------------------------
+     The admin back office still references the old brand tokens. They are
+     remapped here rather than removed so /admin keeps rendering; the
+     storefront no longer uses them. */
+  --color-gold-300: var(--color-bronze-300);
+  --color-gold-400: var(--color-bronze-400);
+  --color-gold-500: var(--color-bronze-500);
+  --color-gold-600: var(--color-bronze-600);
+  --color-choc-950: var(--color-ink-900);
+  --color-choc-900: var(--color-ink-900);
+  --color-choc-800: var(--color-ink-800);
+  --color-choc-700: var(--color-ink-700);
+  --color-cream-50: var(--color-ink-50);
+  --color-cream-100: var(--color-ink-100);
+}
+
+/* ---------------------------------------------------------------------------
+   Semantic tokens, resolved per theme.
+   Light: pure white canvas, #f5f5f7 for alternating bands.
+   Dark:  true black canvas, #1d1d1f for raised surfaces.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: var(--color-ink-0);
+  --surface: var(--color-ink-50);
+  --surface-2: var(--color-ink-100);
+  --fg: var(--color-ink-900);
+  --muted: var(--color-ink-500); /* 4.9:1 on white */
+  --border: var(--color-ink-200);
+  --hairline: rgba(0, 0, 0, 0.09);
+  --accent: var(--color-bronze-600); /* 5.2:1 on white */
+  --accent-strong: var(--color-bronze-700);
+  --accent-fg: var(--color-ink-0);
+  --primary: var(--color-ink-900);
+  --primary-fg: var(--color-ink-0);
+  --scrim: rgba(0, 0, 0, 0.42);
+  --chrome: rgba(255, 255, 255, 0.72);
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --bg: var(--color-ink-950);
+  --surface: var(--color-ink-900);
+  --surface-2: var(--color-ink-800);
+  --fg: var(--color-ink-50);
+  --muted: var(--color-ink-300); /* 8.9:1 on black */
+  --border: var(--color-ink-700);
+  --hairline: rgba(255, 255, 255, 0.12);
+  --accent: var(--color-bronze-300); /* 10.1:1 on black */
+  --accent-strong: var(--color-bronze-400);
+  --accent-fg: var(--color-ink-950);
+  --primary: var(--color-ink-50);
+  --primary-fg: var(--color-ink-900);
+  --scrim: rgba(0, 0, 0, 0.62);
+  --chrome: rgba(0, 0, 0, 0.72);
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--color-ink-950);
+    --surface: var(--color-ink-900);
+    --surface-2: var(--color-ink-800);
+    --fg: var(--color-ink-50);
+    --muted: var(--color-ink-300);
+    --border: var(--color-ink-700);
+    --hairline: rgba(255, 255, 255, 0.12);
+    --accent: var(--color-bronze-300);
+    --accent-strong: var(--color-bronze-400);
+    --accent-fg: var(--color-ink-950);
+    --primary: var(--color-ink-50);
+    --primary-fg: var(--color-ink-900);
+    --scrim: rgba(0, 0, 0, 0.62);
+    --chrome: rgba(0, 0, 0, 0.72);
+    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-fg: var(--accent-fg);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    /* 17px — Apple's body size. Set in rem so a larger system text size
+       scales the layout with it rather than breaking it. */
+    font-size: 1.0625rem;
+    line-height: 1.5294;
+    letter-spacing: -0.011em;
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :root[dir="rtl"] body,
+  [dir="rtl"] {
+    font-family: var(--font-arabic);
+    letter-spacing: 0;
+  }
+
+  /* Tracking is size-specific: large text needs negative tracking, small text
+     needs a touch of positive. A single letter-spacing value is wrong somewhere. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-wrap: balance;
+    font-optical-sizing: auto;
+  }
+
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [dir="rtl"] h4 {
+    font-family: var(--font-arabic);
+    letter-spacing: 0;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-xs);
+  }
+}
+
+@layer components {
+  /* ---- Type scale -------------------------------------------------------
+     Four display steps and two text steps. Weight and leading move with size
+     as a set; hierarchy never comes from size alone. */
+  /* `text-wrap: balance` lives on the type classes, not only on h1–h4, so a
+     display-scale line set as a <p> gets the same even ragging. */
+  .t-display,
+  .t-h1,
+  .t-h2,
+  .t-h3 {
+    text-wrap: balance;
+  }
+
+  .t-display {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6.2vw, 4.5rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.028em;
+  }
+
+  .t-h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.6vw, 3rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.024em;
+  }
+
+  .t-h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 600;
+    line-height: 1.14;
+    letter-spacing: -0.02em;
+  }
+
+  .t-h3 {
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    font-weight: 600;
+    line-height: 1.24;
+    letter-spacing: -0.014em;
+  }
+
+  .t-lead {
+    font-size: clamp(1.125rem, 1.6vw, 1.3125rem);
+    line-height: 1.42;
+    letter-spacing: -0.012em;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .t-caption {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    letter-spacing: 0.004em;
+    color: var(--muted);
+  }
+
+  [dir="rtl"] .t-display,
+  [dir="rtl"] .t-h1,
+  [dir="rtl"] .t-h2,
+  [dir="rtl"] .t-h3,
+  [dir="rtl"] .t-lead,
+  [dir="rtl"] .t-caption {
+    font-family: var(--font-arabic);
+    letter-spacing: 0;
+  }
+
+  /* ---- Layout rails ----------------------------------------------------- */
+  .rail {
+    width: 100%;
+    max-width: 1220px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .rail {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* Text-first sections sit on a narrower measure so prose stays at 65–75ch. */
+  .rail-narrow {
+    width: 100%;
+    max-width: 860px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .rail-narrow {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* Keyboard users reach this before the nav; it stays out of the way until
+     it is focused. */
+  .skip-link {
+    position: fixed;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 0.5rem;
+    z-index: var(--z-toast);
+    transform: translateY(-150%);
+    border-radius: var(--radius-pill);
+    background: var(--fg);
+    color: var(--bg);
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: transform var(--duration-pop) var(--ease-out);
+  }
+
+  .skip-link:focus-visible {
+    transform: none;
+  }
+
+  /* ---- Scroll reveal ----------------------------------------------------
+     The default is visible. The hidden state only exists inside `.js` (set by
+     the pre-paint script) and only when the viewer has not asked for reduced
+     motion, so the reveal enhances a page that already renders rather than
+     gating it. `--reveal-delay` staggers items within one list. */
+  @media (prefers-reduced-motion: no-preference) {
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+
+    .js .reveal[data-in="true"] {
+      opacity: 1;
+      transform: none;
+      transition:
+        opacity 600ms var(--ease-out),
+        transform 600ms var(--ease-out);
+      transition-delay: var(--reveal-delay, 0ms);
+    }
+  }
+
+  /* ---- Chrome: translucent layers with content scrolling underneath, not
+     opaque bars that consume a fixed strip. ------------------------------- */
+  .chrome {
+    background: var(--chrome);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+@layer utilities {
+  /* Kept for the admin back office, which still references it. */
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .glass {
+    background: var(--chrome);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* A hairline that reads at 1px on retina without turning into a hard rule. */
+  .rule {
+    border-color: var(--hairline);
+  }
+}
+
+/* Reduced motion is not optional. Cross-fade in place of travel; never remove
+   the state change itself. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Frostier chrome when the viewer has asked for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome,
+  .glass {
+    background: var(--bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

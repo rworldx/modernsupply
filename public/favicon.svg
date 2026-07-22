@@ -1,0 +1,23 @@
+<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+  <title>Modern Supply</title>
+  <!-- The visible default is set with presentation attributes so the mark still
+       renders in tools that ignore <style> in an icon. The stylesheet only
+       inverts it for dark browser chrome, where a near-black plate would
+       otherwise disappear into the tab strip. Radius and ink values match the
+       site's design tokens. -->
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .plate { fill: #f5f5f7; }
+      .mark { stroke: #1d1d1f; }
+    }
+  </style>
+  <rect class="plate" width="180" height="180" rx="40" fill="#1d1d1f" />
+  <path
+    class="mark"
+    d="M48 132V52l42 50 42-50v80"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="15"
+    stroke-linejoin="miter"
+  />
+</svg>
