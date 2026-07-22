@@ -5,25 +5,39 @@ import { SignJWT, jwtVerify } from "jose";
 
 const COOKIE = "ms_admin_session";
 
-// The dev fallback exists so a fresh clone runs without setup. In production it
-// would be a forgeable session key — anyone who read this file could sign an
-// admin cookie — so a missing AUTH_SECRET is a hard startup failure instead.
+let cachedSecret: Uint8Array | undefined;
+
+/**
+ * The signing key for the admin session cookie.
+ *
+ * Resolved lazily, on first use, and never at module load. Next.js evaluates
+ * route modules during the build's page-data collection step, where runtime
+ * secrets are legitimately absent — throwing there fails the build rather than
+ * catching a real misconfiguration.
+ *
+ * The dev fallback lets a fresh clone run without setup. Shipping that fallback
+ * to production would publish a forgeable session key: the repo is public, so
+ * anyone could read the string and sign themselves an admin cookie. In
+ * production a missing AUTH_SECRET is therefore a hard failure at request time.
+ */
 function sessionSecret(): Uint8Array {
+  if (cachedSecret) return cachedSecret;
+
   const configured = process.env.AUTH_SECRET;
 
   if (!configured) {
     if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "AUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and set it in the environment before starting the server.",
+        "AUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and set it in the deployment environment.",
       );
     }
-    return new TextEncoder().encode("insecure-dev-secret-change-me");
+    cachedSecret = new TextEncoder().encode("insecure-dev-secret-change-me");
+    return cachedSecret;
   }
 
-  return new TextEncoder().encode(configured);
+  cachedSecret = new TextEncoder().encode(configured);
+  return cachedSecret;
 }
-
-const secret = sessionSecret();
 
 /** Verify a username/password against the server-side env credentials. */
 export function checkCredentials(username: string, password: string): boolean {
@@ -38,7 +52,7 @@ export async function createSession(): Promise<void> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(secret);
+    .sign(sessionSecret());
 
   const jar = await cookies();
   jar.set(COOKIE, token, {
@@ -66,7 +80,7 @@ export async function isAuthenticated(): Promise<boolean> {
   const token = jar.get(COOKIE)?.value;
   if (!token) return false;
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, sessionSecret());
     return payload.role === "admin";
   } catch {
     return false;
