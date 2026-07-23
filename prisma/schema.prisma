@@ -1,13 +1,17 @@
 // Modern Supply — database schema.
-// Dev: SQLite (zero-config, runs locally). Production: switch `provider` to
-// "postgresql" and point DATABASE_URL at Neon/Supabase, then re-run migrations.
+//
+// Postgres in every environment, including local development. The app runs on
+// Vercel, whose filesystem is read-only and ephemeral, so a SQLite file cannot
+// survive there: writes vanish between requests and the file is absent from a
+// fresh deploy. One provider everywhere also keeps a single migration history,
+// so what passes locally is what runs in production.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

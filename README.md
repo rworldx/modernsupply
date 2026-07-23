@@ -11,14 +11,15 @@ inventory management, and sales charts).
 
 - **Next.js 16** (App Router, React 19, Turbopack) + **TypeScript**
 - **Tailwind CSS v4** — "Liquid Gold" design system (dark chocolate + ivory + gold), light/dark themes
-- **Prisma 6** ORM — **SQLite** in dev, **Postgres** in production (see below)
+- **Prisma 6** ORM — **Postgres** in every environment, dev included (see below)
 - **jose** httpOnly-cookie admin auth · **Framer Motion** · **Recharts** · **Radix UI** · **lucide-react**
 
 ## Getting started
 
 ```bash
 npm install
-npm run db:migrate      # create/apply the SQLite schema (prisma/dev.db)
+# Put the project's Postgres URL in .env and .env.local first — see Environment below.
+npm run db:migrate      # create/apply the schema
 npm run db:seed         # seed 168 products from the static catalog (stock starts at 0)
 npm run dev             # http://localhost:3000  (redirects / → /en)
 ```
@@ -30,7 +31,7 @@ stock is entered — that is expected.
 ## Environment (`.env.local`, git-ignored — never commit real values)
 
 ```env
-DATABASE_URL="file:./dev.db"      # dev; Postgres URL in production
+DATABASE_URL="postgres://..."      # same Postgres URL in dev and production
 ADMIN_USERNAME="<admin-username>"  # ask the site owner; never commit the real value
 ADMIN_PASSWORD="<admin-password>"  # checked server-side only, never shipped to the browser
 AUTH_SECRET="<long-random-string>" # signs the admin session cookie; `openssl rand -base64 32`
@@ -77,13 +78,24 @@ truth for brands, categories, product names/units, branches, and Oman governorat
 Adding the 2 future brands or filling the empty catalogs (Torino, Italian Master, Gusto)
 only requires editing `src/data/*` and re-running `npm run db:seed`.
 
-## Deploying to production (Postgres)
+## Deploying to production
 
-1. In `prisma/schema.prisma`, change `datasource.provider` from `"sqlite"` to `"postgresql"`.
-2. Set `DATABASE_URL` to your Neon/Supabase/Vercel-Postgres connection string.
-3. `npx prisma migrate deploy` then `npm run db:seed`.
-4. Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `AUTH_SECRET`, `NEXT_PUBLIC_SITE_URL` in the host's
-   env. Deploy (`npm run build` runs `prisma generate` first). Runs as a Node app (not static export).
+Hosted on Vercel, as a Node app (not a static export).
+
+1. Attach a Postgres database to the project (Vercel dashboard → **Storage** → Prisma
+   Postgres). Vercel injects `DATABASE_URL` into every environment automatically.
+2. Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `AUTH_SECRET`, and `NEXT_PUBLIC_SITE_URL` in the
+   project's environment variables. `AUTH_SECRET` is a hard requirement — in production the
+   server refuses to sign a session without it (`openssl rand -base64 32`).
+3. Deploy. `npm run build` runs `prisma generate && prisma migrate deploy && tsx prisma/seed.ts`
+   before `next build`, so each deploy applies pending migrations and re-syncs the `Product`
+   table with `src/data/products.ts`. The seed upserts by id and never overwrites `stock` or
+   `active`, so admin-entered counts survive every deploy.
+
+> **Do not switch the datasource back to SQLite.** Vercel's filesystem is read-only and
+> ephemeral: a `file:` database is absent on a fresh deploy and any writes are discarded
+> between requests. That is what caused the `PrismaClientInitializationError` 500s on
+> `/admin` and `/[lang]/[brand]`.
 
 ## Useful scripts
 
