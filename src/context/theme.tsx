@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from "react";
 
 export type Theme = "system" | "light" | "dark";
 type Resolved = "light" | "dark";
@@ -24,48 +30,63 @@ function resolve(theme: Theme): Resolved {
   return theme;
 }
 
-// Applies the resolved theme to <html data-theme>. This is the ONLY writer of
-// data-theme, so it can never race with the server-rendered lang/dir attributes.
-function apply(theme: Theme) {
-  const r = resolve(theme);
-  document.documentElement.setAttribute("data-theme", r);
-  return r;
+// localStorage and the OS colour-scheme query are the store; React reads them
+// rather than keeping a second copy in state. Copying them into state on mount
+// meant the first render always claimed "system"/"light" regardless of the truth,
+// and a choice made in another tab went unnoticed until reload.
+const listeners = new Set<() => void>();
+
+function emit() {
+  for (const l of listeners) l();
 }
 
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  // Another tab writing the key, and the OS flipping scheme, are both the store
+  // changing underneath us.
+  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  window.addEventListener("storage", onChange);
+  mql.addEventListener("change", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+    mql.removeEventListener("change", onChange);
+  };
+}
+
+function readTheme(): Theme {
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s === "light" || s === "dark" || s === "system") return s;
+  } catch {
+    /* ignore */
+  }
+  return "system";
+}
+
+// Both snapshots return primitives, so they are referentially stable by
+// construction — the usual useSyncExternalStore infinite-loop trap does not apply.
+const readResolved = (): Resolved => resolve(readTheme());
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolved, setResolved] = useState<Resolved>("light");
+  const theme = useSyncExternalStore(subscribe, readTheme, () => "system" as Theme);
+  const resolved = useSyncExternalStore(subscribe, readResolved, () => "light" as Resolved);
 
-  // Load stored choice once, after mount (SSR-safe).
+  // Push the resolved theme at <html data-theme>. This is the ONLY writer of
+  // data-theme, so it can never race with the server-rendered lang/dir attributes.
+  // An effect is right here: it updates an external system from React state,
+  // which is what effects are for.
   useEffect(() => {
-    let stored: Theme = "system";
-    try {
-      const s = localStorage.getItem(KEY);
-      if (s === "light" || s === "dark" || s === "system") stored = s;
-    } catch {
-      /* ignore */
-    }
-    setThemeState(stored);
-    setResolved(apply(stored));
-  }, []);
-
-  // Follow the OS when in system mode.
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setResolved(apply("system"));
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [theme]);
+    document.documentElement.setAttribute("data-theme", resolved);
+  }, [resolved]);
 
   const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-    setResolved(apply(t));
     try {
       localStorage.setItem(KEY, t);
     } catch {
       /* ignore */
     }
+    emit();
   }, []);
 
   const cycle = useCallback(() => {

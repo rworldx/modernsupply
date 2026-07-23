@@ -41,41 +41,79 @@ function TrackInner() {
 
   const [order, setOrder] = useState(sp.get("order") ?? "");
   const [phone, setPhone] = useState(sp.get("phone") ?? "");
-  const [loading, setLoading] = useState(false);
+  // Arriving from the confirmation link means a lookup starts immediately, so the
+  // very first render is already the loading one — no effect needed to say so.
+  const [loading, setLoading] = useState(() => Boolean(sp.get("order") && sp.get("phone")));
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<TrackedOrder | null>(null);
 
-  const lookup = useCallback(async (o: string, p: string) => {
-    if (!o.trim() || !p.trim()) return;
-    setLoading(true);
-    setError(null);
-    setData(null);
-    try {
-      const res = await fetch(`/api/track?order=${encodeURIComponent(o.trim())}&phone=${encodeURIComponent(p.trim())}`);
-      if (res.status === 404) {
-        setError(t(
-          "No order matches that number and phone. Check both against the confirmation message.",
-          "لا يوجد طلب يطابق هذا الرقم والهاتف. تحقق منهما في رسالة التأكيد.",
-        ));
-        return;
+  // Just the request: no state touched, so it is safe to start from an effect.
+  const request = useCallback(
+    async (o: string, p: string): Promise<{ data: TrackedOrder } | { error: string }> => {
+      try {
+        const res = await fetch(
+          `/api/track?order=${encodeURIComponent(o.trim())}&phone=${encodeURIComponent(p.trim())}`,
+        );
+        if (res.status === 404) {
+          return {
+            error: t(
+              "No order matches that number and phone. Check both against the confirmation message.",
+              "لا يوجد طلب يطابق هذا الرقم والهاتف. تحقق منهما في رسالة التأكيد.",
+            ),
+          };
+        }
+        if (!res.ok) {
+          return { error: t("Something went wrong. Please try again.", "حدث خطأ. حاول مرة أخرى.") };
+        }
+        return { data: await res.json() };
+      } catch {
+        return {
+          error: t(
+            "Network error. Check your connection and try again.",
+            "خطأ في الشبكة. تحقق من اتصالك وحاول مرة أخرى.",
+          ),
+        };
       }
-      if (!res.ok) {
-        setError(t("Something went wrong. Please try again.", "حدث خطأ. حاول مرة أخرى."));
-        return;
-      }
-      setData(await res.json());
-    } catch {
-      setError(t("Network error. Check your connection and try again.", "خطأ في الشبكة. تحقق من اتصالك وحاول مرة أخرى."));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+    },
+    [t],
+  );
 
-  // Auto-lookup when arriving from the order confirmation link.
+  const apply = useCallback((result: { data: TrackedOrder } | { error: string }) => {
+    if ("error" in result) {
+      setError(result.error);
+      setData(null);
+    } else {
+      setData(result.data);
+      setError(null);
+    }
+    setLoading(false);
+  }, []);
+
+  const lookup = useCallback(
+    async (o: string, p: string) => {
+      if (!o.trim() || !p.trim()) return;
+      setLoading(true);
+      setError(null);
+      setData(null);
+      apply(await request(o, p));
+    },
+    [apply, request],
+  );
+
+  // Auto-lookup when arriving from the order confirmation link. The state lands
+  // in the fetch's continuation rather than in the effect body, so this cannot
+  // cascade an extra render pass before the browser paints.
   useEffect(() => {
     const o = sp.get("order");
     const p = sp.get("phone");
-    if (o && p) lookup(o, p);
+    if (!o || !p) return;
+    let live = true;
+    request(o, p).then((result) => {
+      if (live) apply(result);
+    });
+    return () => {
+      live = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

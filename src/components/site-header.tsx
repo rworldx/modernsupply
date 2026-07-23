@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const { lang, t, switchTo, other, isRtl } = useLang();
-  const { itemCount, setOpen, hydrated } = useCart();
+  const { itemCount, setOpen } = useCart();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,7 +24,15 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => setMenuOpen(false), [pathname]);
+  // Close the mobile panel when the route changes. Adjusting state during render
+  // is React's documented alternative to an effect for "reset when a prop
+  // changes": React discards this render and redoes it before touching the DOM,
+  // so the panel never paints open on the new page the way an effect would let it.
+  const [panelPath, setPanelPath] = useState(pathname);
+  if (pathname !== panelPath) {
+    setPanelPath(pathname);
+    setMenuOpen(false);
+  }
 
   // Lock the page while the mobile panel covers it.
   useEffect(() => {
@@ -99,7 +107,7 @@ export function SiteHeader() {
               aria-label={t("Open your order", "فتح طلبك")}
             >
               <ShoppingBag className="size-[1.125rem]" strokeWidth={1.5} />
-              {hydrated && itemCount > 0 && (
+              {itemCount > 0 && (
                 <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[0.625rem] font-medium tabular-nums text-accent-fg">
                   {itemCount}
                 </span>

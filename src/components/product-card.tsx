@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import type { CatalogProduct } from "@/lib/types";
 import { useCart } from "@/context/cart";
 import { useLang } from "@/context/language";
-import { categoryIcon } from "@/lib/product-visual";
+import { CategoryGlyph } from "@/lib/product-visual";
 import { stockLevel, stockLabel, STOCK_STYLE } from "@/lib/inventory";
 import { Reveal } from "@/components/motion";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,6 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
 
-  const Icon = categoryIcon(product.categoryId);
   const level = product.active ? stockLevel(product.stock, product.lowStockThreshold) : "out";
   const style = STOCK_STYLE[level];
   const soldOut = level === "out";
@@ -43,8 +42,8 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
           the category signal; the name does the rest. */}
       <div className="relative aspect-square overflow-hidden rounded-[var(--radius-lg)] bg-surface">
         <div className="absolute inset-0 grid place-items-center">
-          <Icon
-            strokeWidth={0.75}
+          <CategoryGlyph
+            categoryId={product.categoryId}
             className={cn(
               "size-20 transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-[1.05]",
               soldOut ? "text-muted/25" : "text-muted/45",
