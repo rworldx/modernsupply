@@ -24,18 +24,19 @@ export const metadata: Metadata = {
   },
   description,
   icons: { icon: "/favicon.svg" },
+  // No `images` here: opengraph-image.tsx and twitter-image.tsx generate the
+  // cards and their og:image/twitter:image tags. File-based metadata overrides
+  // this object, so listing an image would only be a second thing to keep in sync.
   openGraph: {
     type: "website",
     siteName: "Modern Supply",
     title: "Modern Supply — الإمداد العصري",
     description,
-    images: [{ url: "/opengraph.jpg", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Modern Supply — الإمداد العصري",
     description,
-    images: ["/opengraph.jpg"],
   },
 };
 

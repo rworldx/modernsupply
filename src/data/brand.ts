@@ -131,6 +131,16 @@ export const brands: Brand[] = [
   },
 ];
 
+// The last two brands are placeholders for names not yet public. They render on
+// the site as "Coming soon" cards, but must stay out of anything that reads as
+// marketing copy — a social card listing "Brand 6, Brand 7" looks unfinished.
+// Torino, Italian Master and Gusto are real brands that simply have no stock yet,
+// so `hasProducts` is the wrong test here.
+const UNANNOUNCED = new Set(["brand-six", "brand-seven"]);
+
+/** Brands whose name is public and safe to show off-site. */
+export const namedBrands: Brand[] = brands.filter((b) => !UNANNOUNCED.has(b.id));
+
 export function getBrand(id: string): Brand {
   const b = brands.find((x) => x.id === id);
   if (!b) throw new Error(`Unknown brand: ${id}`);
