@@ -133,39 +133,15 @@ export const brands: Brand[] = [
     accent: "orange",
     hasProducts: true,
   },
-  {
-    id: "brand-six",
-    nameEn: "Brand 6",
-    nameAr: "براند ٦",
-    originEn: "Coming Soon",
-    originAr: "قريباً",
-    descriptionEn: "A new premium brand joining the Modern Supply family. Details coming soon.",
-    descriptionAr: "براند فاخر جديد ينضم لعائلة الإمداد العصري. التفاصيل قريباً.",
-    accent: "violet",
-    hasProducts: false,
-  },
-  {
-    id: "brand-seven",
-    nameEn: "Brand 7",
-    nameAr: "براند ٧",
-    originEn: "Coming Soon",
-    originAr: "قريباً",
-    descriptionEn: "A new premium brand joining the Modern Supply family. Details coming soon.",
-    descriptionAr: "براند فاخر جديد ينضم لعائلة الإمداد العصري. التفاصيل قريباً.",
-    accent: "orange",
-    hasProducts: false,
-  },
 ];
 
-// The last two brands are placeholders for names not yet public. They render on
-// the site as "Coming soon" cards, but must stay out of anything that reads as
-// marketing copy — a social card listing "Brand 6, Brand 7" looks unfinished.
-// Torino, Italian Master and Gusto are real brands that simply have no stock yet,
-// so `hasProducts` is the wrong test here.
-const UNANNOUNCED = new Set(["brand-six", "brand-seven"]);
-
-/** Brands whose name is public and safe to show off-site. */
-export const namedBrands: Brand[] = brands.filter((b) => !UNANNOUNCED.has(b.id));
+/**
+ * Brands whose name is public and safe to show off-site (e.g. the social card).
+ * Every brand qualifies now that the "Brand 6 / Brand 7" placeholders are gone;
+ * kept as a named export so callers that want public-only brands stay correct
+ * if an unannounced placeholder is ever reintroduced.
+ */
+export const namedBrands: Brand[] = brands;
 
 export function getBrand(id: string): Brand {
   const b = brands.find((x) => x.id === id);
