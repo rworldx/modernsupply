@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ClipboardList, Boxes, LogOut, ExternalLink, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Boxes, Tag, LogOut, ExternalLink, Globe } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAdminLang } from "@/context/admin-language";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export function AdminNav() {
     { href: "/admin", label: t("Dashboard", "لوحة التحكم"), icon: LayoutDashboard, exact: true },
     { href: "/admin/orders", label: t("Orders", "الطلبات"), icon: ClipboardList },
     { href: "/admin/inventory", label: t("Inventory", "المخزون"), icon: Boxes },
+    { href: "/admin/discounts", label: t("Discounts", "الخصومات"), icon: Tag },
   ];
 
   const active = (href: string, exact?: boolean) =>

@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getCategoriesForBrand, getCategory } from "@/data/products";
 import type { CatalogProduct } from "@/lib/types";
+import { getActiveDiscounts } from "@/lib/discounts";
+import { priceFor } from "@/lib/pricing";
 
 /** Merge DB stock rows with the static catalog for a brand's products. */
 export async function getBrandCatalog(brandId: string): Promise<{
@@ -9,10 +11,17 @@ export async function getBrandCatalog(brandId: string): Promise<{
   categories: { id: string; nameEn: string; nameAr: string; count: number }[];
 }> {
   // Customer-facing: only listed (active) products appear in the storefront.
-  const rows = await db.product.findMany({ where: { brandId, active: true } });
+  const [rows, discounts] = await Promise.all([
+    db.product.findMany({ where: { brandId, active: true } }),
+    getActiveDiscounts(),
+  ]);
 
   const products: CatalogProduct[] = rows.map((r) => {
     const cat = getCategory(r.categoryId as never);
+    const pricing = priceFor(
+      { id: r.id, brandId: r.brandId, categoryId: r.categoryId, priceOmr: r.priceOmr },
+      discounts,
+    );
     return {
       id: r.id,
       brandId: r.brandId,
@@ -26,6 +35,9 @@ export async function getBrandCatalog(brandId: string): Promise<{
       stock: r.stock,
       lowStockThreshold: r.lowStockThreshold,
       active: r.active,
+      priceOmr: pricing.base,
+      finalOmr: pricing.final,
+      percentOff: pricing.percentOff,
     };
   });
 

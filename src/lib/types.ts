@@ -12,4 +12,10 @@ export interface CatalogProduct {
   stock: number;
   lowStockThreshold: number;
   active: boolean;
+  /** Original price in OMR; null when no price has been set. */
+  priceOmr: number | null;
+  /** Price after the best applicable discount; equals priceOmr when none. */
+  finalOmr: number | null;
+  /** Whole-percent reduction applied, 0 when none. */
+  percentOff: number;
 }

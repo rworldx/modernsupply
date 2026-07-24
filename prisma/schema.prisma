@@ -26,6 +26,7 @@ model Product {
   nameAr            String
   unitEn            String
   unitAr            String
+  priceOmr          Float? // base price in OMR; null = no price yet (storefront shows none)
   stock             Int         @default(0)
   lowStockThreshold Int         @default(10)
   active            Boolean     @default(true) // false = delisted / discontinued (hidden from customers)
@@ -35,6 +36,28 @@ model Product {
 
   @@index([brandId])
   @@index([categoryId])
+}
+
+// An admin-run price reduction. Scope is one of brand / category / product, so a
+// single row can discount a whole brand ("20% off all Cremino") or one SKU.
+// The lowest-scoped active discount wins for a given product (see lib/pricing).
+model Discount {
+  id         String   @id @default(cuid())
+  scope      String // "brand" | "category" | "product" | "all"
+  targetId   String // brandId / categoryId / productId; "" when scope = "all"
+  percentOff Int // 1-90
+  active     Boolean  @default(true)
+  // Optional announcement shown in the storefront popup. When titleEn is set and
+  // the discount is active, the popup advertises this offer.
+  titleEn    String?
+  titleAr    String?
+  bodyEn     String?
+  bodyAr     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([scope, targetId])
+  @@index([active])
 }
 
 // A customer order. No customer accounts — tracked by orderNumber + phone.

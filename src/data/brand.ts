@@ -76,10 +76,12 @@ export const brands: Brand[] = [
     nameAr: "إيطاليان ماستر",
     originEn: "Italy",
     originAr: "إيطاليا",
-    descriptionEn: "Italian-origin F&B ingredients brand distributed by Modern Supply.",
-    descriptionAr: "براند إيطالي لمكونات الأغذية والمشروبات يوزعه الإمداد العصري.",
+    descriptionEn:
+      "Sauces, fruit purees, ready mix powders, soft ice cream powders, syrups and slushies — the drinks and dessert range behind the counter.",
+    descriptionAr:
+      "صوصات، هريس فواكه، خلطات جاهزة، بودرة آيس كريم، شراب وسلاش — تشكيلة المشروبات والحلويات خلف الكاونتر.",
     accent: "emerald",
-    hasProducts: false,
+    hasProducts: true,
   },
   {
     id: "gusto",
@@ -105,6 +107,30 @@ export const brands: Brand[] = [
     descriptionAr:
       "تقوم London Chocolate بتوزيع الشوكولاتة الفاخرة والكريمات والصلصات ومساحيق الآيس كريم ومساحيق الخليط الجاهز والشراب والمهروس وحشوات الفواكه.",
     accent: "primary",
+    hasProducts: true,
+  },
+  {
+    id: "al-rai",
+    nameEn: "Al Rai",
+    nameAr: "الراعي",
+    originEn: "Oman",
+    originAr: "عُمان",
+    descriptionEn:
+      "Ready-to-freeze ice cream mix in 20 kg packs, in the flavours Omani parlours actually sell — including almond bitham and fursaad.",
+    descriptionAr:
+      "مزيج آيس كريم جاهز للتجميد بعبوات 20 كجم، بالنكهات التي تبيعها محلات عُمان فعلاً — منها لوز البيذام والفرصاد.",
+    accent: "sky",
+    hasProducts: true,
+  },
+  {
+    id: "tostato-caffe",
+    nameEn: "Tostato Caffe",
+    nameAr: "توستاتو كافيه",
+    originEn: "Italy",
+    originAr: "إيطاليا",
+    descriptionEn: "Roasted coffee beans, supplied by the kilo.",
+    descriptionAr: "حبوب قهوة محمصة، تُورَّد بالكيلو.",
+    accent: "orange",
     hasProducts: true,
   },
   {

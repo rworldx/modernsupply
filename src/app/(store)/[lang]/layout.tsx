@@ -7,6 +7,7 @@ import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { CartDrawer } from "@/components/cart-drawer";
+import { AnnouncementPopup } from "@/components/announcement-popup";
 import { ThemeScript } from "@/components/theme-toggle";
 
 export function generateStaticParams() {
@@ -78,6 +79,7 @@ export default async function StoreLayout({
             <SiteFooter />
           </div>
           <CartDrawer />
+          <AnnouncementPopup />
         </Providers>
       </body>
     </html>

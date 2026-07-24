@@ -25,6 +25,7 @@ export interface InventoryRow {
   categoryName: string;
   categoryNameAr: string;
   unitEn: string;
+  priceOmr: number | null;
   stock: number;
   lowStockThreshold: number;
   active: boolean;
@@ -102,13 +103,14 @@ export function InventoryManager({ products }: { products: InventoryRow[] }) {
               <th className="px-4 py-3 text-start font-medium">{t("Product", "المنتج")}</th>
               <th className="hidden px-4 py-3 text-start font-medium md:table-cell">{t("Brand", "البراند")}</th>
               <th className="hidden px-4 py-3 text-start font-medium lg:table-cell">{t("Category", "الفئة")}</th>
+              <th className="hidden px-4 py-3 text-end font-medium sm:table-cell">{t("Price", "السعر")}</th>
               <th className="px-4 py-3 text-end font-medium">{t("Stock", "المخزون")}</th>
               <th className="px-4 py-3 text-start font-medium">{t("Status", "الحالة")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="py-16 text-center text-muted"><Boxes className="mx-auto mb-2 h-8 w-8" />{t("No products match.", "لا توجد منتجات مطابقة.")}</td></tr>
+              <tr><td colSpan={6} className="py-16 text-center text-muted"><Boxes className="mx-auto mb-2 h-8 w-8" />{t("No products match.", "لا توجد منتجات مطابقة.")}</td></tr>
             ) : filtered.map((p) => {
               const l = levelOf(p);
               const s = STOCK_STYLE[l];
@@ -120,6 +122,7 @@ export function InventoryManager({ products }: { products: InventoryRow[] }) {
                   </td>
                   <td className="hidden px-4 py-3 text-muted md:table-cell">{p.brandName}</td>
                   <td className="hidden px-4 py-3 text-muted lg:table-cell">{t(p.categoryName, p.categoryNameAr)}</td>
+                  <td className="hidden px-4 py-3 text-end tabular-nums sm:table-cell">{p.priceOmr == null ? <span className="text-muted">—</span> : p.priceOmr.toFixed(3)}</td>
                   <td className="px-4 py-3 text-end font-bold tabular-nums">{p.stock}</td>
                   <td className="px-4 py-3">
                     {p.active ? (
@@ -168,6 +171,7 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
   const [restock, setRestock] = useState("");
   const [setStock, setSetStock] = useState("");
   const [threshold, setThreshold] = useState(String(product.lowStockThreshold));
+  const [price, setPrice] = useState(product.priceOmr == null ? "" : String(product.priceOmr));
   const [active, setActive] = useState(product.active);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -185,6 +189,8 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
     const body: Record<string, unknown> = { lowStockThreshold: Number(threshold), active };
     if (setStock.trim()) body.setStock = Number(setStock);
     if (restock.trim()) body.restock = Number(restock);
+    // Empty price field clears the price (null); otherwise send the number.
+    body.priceOmr = price.trim() === "" ? null : Number(price);
     const res = await fetch(`/api/admin/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setSaving(false);
     if (res.ok) onDone(); else setMsg(t("Could not save changes.", "تعذّر حفظ التغييرات."));
@@ -229,6 +235,12 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
         </div>
 
         <div>
+          <Label htmlFor="pr">{t("Price (OMR)", "السعر (ر.ع)")}</Label>
+          <Input id="pr" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder={t("e.g. 12.500 — leave empty for no price", "مثال: 12.500 — اتركه فارغاً لبدون سعر")} />
+          <p className="mt-1 text-xs text-muted">{t("Shown to customers as the price, before any discount. Empty means no price is shown.", "يُعرض للعملاء كسعر قبل أي خصم. الفارغ يعني عدم عرض سعر.")}</p>
+        </div>
+
+        <div>
           <Label htmlFor="th">{t("Low-stock threshold", "حد المخزون المنخفض")}</Label>
           <Input id="th" inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value.replace(/[^\d]/g, ""))} />
           <p className="mt-1 text-xs text-muted">{t("At or below this, the item shows yellow “Low stock”.", "عند هذا الحد أو أقل، يظهر المنتج باللون الأصفر «منخفض».")}</p>
@@ -266,6 +278,9 @@ function AddProduct({ onDone }: { onDone: () => void }) {
   const [categoryId, setCategoryId] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [nameAr, setNameAr] = useState("");
+  const [unitEn, setUnitEn] = useState("");
+  const [unitAr, setUnitAr] = useState("");
+  const [price, setPrice] = useState("");
   const [stock, setStock] = useState("0");
   const [threshold, setThreshold] = useState("10");
   const [saving, setSaving] = useState(false);
@@ -279,7 +294,16 @@ function AddProduct({ onDone }: { onDone: () => void }) {
     setSaving(true); setMsg(null);
     const res = await fetch("/api/admin/products", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categoryId, nameEn: nameEn.trim(), nameAr: nameAr.trim(), stock: Number(stock) || 0, lowStockThreshold: Number(threshold) || 10 }),
+      body: JSON.stringify({
+        categoryId,
+        nameEn: nameEn.trim(),
+        nameAr: nameAr.trim(),
+        unitEn: unitEn.trim(),
+        unitAr: unitAr.trim(),
+        priceOmr: price.trim() === "" ? null : Number(price),
+        stock: Number(stock) || 0,
+        lowStockThreshold: Number(threshold) || 10,
+      }),
     });
     setSaving(false);
     if (res.ok) onDone(); else setMsg(t("Could not create product.", "تعذّر إنشاء المنتج."));
@@ -313,6 +337,20 @@ function AddProduct({ onDone }: { onDone: () => void }) {
         <div>
           <Label htmlFor="na">{t("Name (Arabic)", "الاسم (عربي)")}</Label>
           <Input id="na" dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="ue">{t("Pack size (English)", "حجم العبوة (إنجليزي)")}</Label>
+            <Input id="ue" value={unitEn} onChange={(e) => setUnitEn(e.target.value)} placeholder={t("e.g. 5 kg", "مثال: 5 kg")} />
+          </div>
+          <div>
+            <Label htmlFor="ua">{t("Pack size (Arabic)", "حجم العبوة (عربي)")}</Label>
+            <Input id="ua" dir="rtl" value={unitAr} onChange={(e) => setUnitAr(e.target.value)} placeholder={t("e.g. 5 كجم", "مثال: 5 كجم")} />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="pr2">{t("Price (OMR)", "السعر (ر.ع)")}</Label>
+          <Input id="pr2" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder={t("Optional — e.g. 12.500", "اختياري — مثال: 12.500")} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

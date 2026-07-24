@@ -8,6 +8,7 @@ import { useCart } from "@/context/cart";
 import { useLang } from "@/context/language";
 import { CategoryGlyph } from "@/lib/product-visual";
 import { stockLevel, stockLabel, STOCK_STYLE } from "@/lib/inventory";
+import { formatOmr } from "@/lib/pricing";
 import { Reveal } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
   const level = product.active ? stockLevel(product.stock, product.lowStockThreshold) : "out";
   const style = STOCK_STYLE[level];
   const soldOut = level === "out";
+  const discounted = product.percentOff > 0 && product.finalOmr != null;
 
   const onAdd = () => {
     addItem({
@@ -50,6 +52,14 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
             )}
           />
         </div>
+        {/* One discount marker per tile, in the bronze accent — the same single
+            accent the rest of the site uses, so a grid on sale stays on-system
+            instead of turning into red pills. */}
+        {discounted && (
+          <span className="absolute end-2 top-2 rounded-[var(--radius-pill)] bg-accent px-2 py-0.5 font-mono text-[0.6875rem] font-semibold tabular-nums text-accent-fg">
+            −{product.percentOff}%
+          </span>
+        )}
         {soldOut && (
           <div className="absolute inset-x-0 bottom-0 bg-bg/85 py-2 text-center text-[0.75rem] font-medium">
             {t("Out of stock", "غير متوفر")}
@@ -62,6 +72,22 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
           {t(product.nameEn, product.nameAr)}
         </h3>
         <p className="mt-0.5 text-[0.8125rem] text-muted">{t(product.unitEn, product.unitAr)}</p>
+
+        {/* Price. When discounted, the old price stays visible and struck so the
+            saving is legible; when there's no price yet, the row is simply
+            absent — the WhatsApp-quote model still holds for unpriced items. */}
+        {product.finalOmr != null && (
+          <p className="mt-1.5 flex items-baseline gap-2 font-mono tabular-nums">
+            <span className="text-[0.9375rem] font-semibold text-fg">
+              {formatOmr(product.finalOmr, lang)}
+            </span>
+            {discounted && product.priceOmr != null && (
+              <span className="text-[0.75rem] text-muted line-through">
+                {formatOmr(product.priceOmr, lang)}
+              </span>
+            )}
+          </p>
+        )}
 
         {/* The exact count only matters when it's running out — "In stock (59)"
             is noise on every card, "Low stock (3)" is a reason to order now. */}

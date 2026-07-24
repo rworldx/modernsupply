@@ -9,6 +9,8 @@ const schema = z
     setStock: z.number().int().min(0).optional(), // absolute value
     lowStockThreshold: z.number().int().min(0).max(100000).optional(),
     active: z.boolean().optional(),
+    // OMR base price. null clears it (product shows no price); omit to leave as-is.
+    priceOmr: z.number().min(0).max(100000).nullable().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "No changes" });
 
@@ -31,7 +33,7 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
   }
-  const { restock, setStock, lowStockThreshold, active } = parsed.data;
+  const { restock, setStock, lowStockThreshold, active, priceOmr } = parsed.data;
 
   try {
     const updated = await db.$transaction(async (tx) => {
@@ -41,6 +43,7 @@ export async function PATCH(
       const data: Record<string, unknown> = {};
       if (lowStockThreshold !== undefined) data.lowStockThreshold = lowStockThreshold;
       if (active !== undefined) data.active = active;
+      if (priceOmr !== undefined) data.priceOmr = priceOmr;
 
       let newStock = current.stock;
       if (setStock !== undefined) newStock = setStock;
@@ -60,7 +63,7 @@ export async function PATCH(
       return tx.product.update({ where: { id }, data });
     });
 
-    return NextResponse.json({ ok: true, stock: updated.stock, active: updated.active, lowStockThreshold: updated.lowStockThreshold });
+    return NextResponse.json({ ok: true, stock: updated.stock, active: updated.active, lowStockThreshold: updated.lowStockThreshold, priceOmr: updated.priceOmr });
   } catch (e) {
     if (e instanceof Error && e.message === "not_found") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

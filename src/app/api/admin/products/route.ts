@@ -8,8 +8,14 @@ const schema = z.object({
   categoryId: z.string().min(1),
   nameEn: z.string().trim().min(1).max(120),
   nameAr: z.string().trim().min(1).max(120),
+  // Pack size is per product now (a cream sells in both 5 kg and 1 kg), so the
+  // admin supplies it on create rather than inheriting one size per category.
+  unitEn: z.string().trim().max(60).default(""),
+  unitAr: z.string().trim().max(60).default(""),
   stock: z.number().int().min(0).default(0),
   lowStockThreshold: z.number().int().min(0).max(100000).default(10),
+  // OMR. Null = no price yet, which the storefront renders as no price at all.
+  priceOmr: z.number().min(0).max(100000).nullable().default(null),
 });
 
 function slugify(s: string) {
@@ -31,7 +37,8 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
   }
-  const { categoryId, nameEn, nameAr, stock, lowStockThreshold } = parsed.data;
+  const { categoryId, nameEn, nameAr, unitEn, unitAr, stock, lowStockThreshold, priceOmr } =
+    parsed.data;
 
   const cat = categories.find((c) => c.id === categoryId);
   if (!cat) {
@@ -51,8 +58,9 @@ export async function POST(request: Request) {
       categoryId: cat.id,
       nameEn,
       nameAr,
-      unitEn: cat.unitEn,
-      unitAr: cat.unitAr,
+      unitEn,
+      unitAr,
+      priceOmr,
       stock,
       lowStockThreshold,
       active: true,
