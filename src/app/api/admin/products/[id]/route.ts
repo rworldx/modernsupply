@@ -11,6 +11,8 @@ const schema = z
     active: z.boolean().optional(),
     // OMR base price. null clears it (product shows no price); omit to leave as-is.
     priceOmr: z.number().min(0).max(100000).nullable().optional(),
+    // Product photo URL. null clears it (falls back to the glyph); omit to leave as-is.
+    imageUrl: z.string().trim().url().max(2000).nullable().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "No changes" });
 
@@ -33,7 +35,7 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
   }
-  const { restock, setStock, lowStockThreshold, active, priceOmr } = parsed.data;
+  const { restock, setStock, lowStockThreshold, active, priceOmr, imageUrl } = parsed.data;
 
   try {
     const updated = await db.$transaction(async (tx) => {
@@ -44,6 +46,7 @@ export async function PATCH(
       if (lowStockThreshold !== undefined) data.lowStockThreshold = lowStockThreshold;
       if (active !== undefined) data.active = active;
       if (priceOmr !== undefined) data.priceOmr = priceOmr;
+      if (imageUrl !== undefined) data.imageUrl = imageUrl;
 
       let newStock = current.stock;
       if (setStock !== undefined) newStock = setStock;
@@ -92,6 +95,9 @@ export async function DELETE(
 
   try {
     await db.stockMovement.deleteMany({ where: { productId: id } });
+    // Remove any product-scoped discount that targeted this product (targetId is
+    // a plain string, not a FK, so it wouldn't cascade on its own).
+    await db.discount.deleteMany({ where: { scope: "product", targetId: id } });
     await db.product.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch {

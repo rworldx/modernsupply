@@ -26,6 +26,7 @@ export interface InventoryRow {
   categoryNameAr: string;
   unitEn: string;
   priceOmr: number | null;
+  imageUrl: string | null;
   stock: number;
   lowStockThreshold: number;
   active: boolean;
@@ -172,6 +173,7 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
   const [setStock, setSetStock] = useState("");
   const [threshold, setThreshold] = useState(String(product.lowStockThreshold));
   const [price, setPrice] = useState(product.priceOmr == null ? "" : String(product.priceOmr));
+  const [image, setImage] = useState(product.imageUrl ?? "");
   const [active, setActive] = useState(product.active);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -191,19 +193,43 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
     if (restock.trim()) body.restock = Number(restock);
     // Empty price field clears the price (null); otherwise send the number.
     body.priceOmr = price.trim() === "" ? null : Number(price);
+    // Empty image field clears the photo (null); otherwise send the URL.
+    body.imageUrl = image.trim() === "" ? null : image.trim();
     const res = await fetch(`/api/admin/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setSaving(false);
     if (res.ok) onDone(); else setMsg(t("Could not save changes.", "تعذّر حفظ التغييرات."));
+  };
+
+  // Delist a product that can't be hard-deleted because it has order history.
+  const delist = async () => {
+    setDeleting(true); setMsg(null);
+    const res = await fetch(`/api/admin/products/${product.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: false }),
+    });
+    setDeleting(false);
+    if (res.ok) onDone(); else setMsg(t("Could not delist.", "تعذّر الإخفاء."));
   };
 
   const del = async () => {
     if (!confirm(t(`Delete "${product.nameEn}"? This cannot be undone.`, `حذف "${product.nameEn}"؟ لا يمكن التراجع.`))) return;
     setDeleting(true); setMsg(null);
     const res = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+    if (res.ok) { setDeleting(false); onDone(); return; }
+    // Products with order history can't be hard-deleted (it would break past
+    // orders). Offer to delist instead, which hides it from customers.
+    if (res.status === 409) {
+      setDeleting(false);
+      if (confirm(t(
+        "This product is in past orders, so it can't be permanently deleted. Hide it from customers instead?",
+        "هذا المنتج موجود في طلبات سابقة، لذا لا يمكن حذفه نهائياً. هل تريد إخفاءه عن العملاء بدلاً من ذلك؟",
+      ))) {
+        await delist();
+      }
+      return;
+    }
     setDeleting(false);
-    if (res.ok) { onDone(); return; }
     const j = await res.json().catch(() => ({}));
-    setMsg(j.message ?? t("Could not delete. Try delisting instead.", "تعذّر الحذف. جرّب الإخفاء بدلاً من ذلك."));
+    setMsg(j.message ?? t("Could not delete.", "تعذّر الحذف."));
   };
 
   return (
@@ -238,6 +264,17 @@ function EditProduct({ product, onDone }: { product: InventoryRow; onDone: () =>
           <Label htmlFor="pr">{t("Price (OMR)", "السعر (ر.ع)")}</Label>
           <Input id="pr" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder={t("e.g. 12.500 — leave empty for no price", "مثال: 12.500 — اتركه فارغاً لبدون سعر")} />
           <p className="mt-1 text-xs text-muted">{t("Shown to customers as the price, before any discount. Empty means no price is shown.", "يُعرض للعملاء كسعر قبل أي خصم. الفارغ يعني عدم عرض سعر.")}</p>
+        </div>
+
+        <div>
+          <Label htmlFor="img">{t("Product image URL", "رابط صورة المنتج")}</Label>
+          <Input id="img" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/photo.jpg" dir="ltr" />
+          {image.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image.trim()} alt="" className="mt-2 h-24 w-24 rounded-xl border border-border object-cover" />
+          ) : (
+            <p className="mt-1 text-xs text-muted">{t("Optional. Empty shows the category icon instead.", "اختياري. الفارغ يعرض أيقونة الفئة بدلاً من ذلك.")}</p>
+          )}
         </div>
 
         <div>
@@ -281,6 +318,8 @@ function AddProduct({ onDone }: { onDone: () => void }) {
   const [unitEn, setUnitEn] = useState("");
   const [unitAr, setUnitAr] = useState("");
   const [price, setPrice] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [image, setImage] = useState("");
   const [stock, setStock] = useState("0");
   const [threshold, setThreshold] = useState("10");
   const [saving, setSaving] = useState(false);
@@ -300,13 +339,19 @@ function AddProduct({ onDone }: { onDone: () => void }) {
         nameAr: nameAr.trim(),
         unitEn: unitEn.trim(),
         unitAr: unitAr.trim(),
+        imageUrl: image.trim() === "" ? null : image.trim(),
         priceOmr: price.trim() === "" ? null : Number(price),
+        discountPercent: discount.trim() === "" ? 0 : Number(discount),
         stock: Number(stock) || 0,
         lowStockThreshold: Number(threshold) || 10,
       }),
     });
     setSaving(false);
-    if (res.ok) onDone(); else setMsg(t("Could not create product.", "تعذّر إنشاء المنتج."));
+    if (res.ok) onDone();
+    else {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error === "Validation failed" ? t("Check the fields — a URL or number looks wrong.", "تحقق من الحقول — يبدو أن رابطاً أو رقماً غير صحيح.") : t("Could not create product.", "تعذّر إنشاء المنتج."));
+    }
   };
 
   return (
@@ -348,9 +393,25 @@ function AddProduct({ onDone }: { onDone: () => void }) {
             <Input id="ua" dir="rtl" value={unitAr} onChange={(e) => setUnitAr(e.target.value)} placeholder={t("e.g. 5 كجم", "مثال: 5 كجم")} />
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="pr2">{t("Price (OMR)", "السعر (ر.ع)")}</Label>
+            <Input id="pr2" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder={t("e.g. 12.500", "مثال: 12.500")} />
+          </div>
+          <div>
+            <Label htmlFor="disc">{t("Discount %", "خصم %")}</Label>
+            <Input id="disc" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^\d]/g, "").slice(0, 2))} placeholder={t("Optional", "اختياري")} />
+          </div>
+        </div>
         <div>
-          <Label htmlFor="pr2">{t("Price (OMR)", "السعر (ر.ع)")}</Label>
-          <Input id="pr2" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder={t("Optional — e.g. 12.500", "اختياري — مثال: 12.500")} />
+          <Label htmlFor="img2">{t("Product image URL", "رابط صورة المنتج")}</Label>
+          <Input id="img2" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/photo.jpg" dir="ltr" />
+          {image.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image.trim()} alt="" className="mt-2 h-24 w-24 rounded-xl border border-border object-cover" />
+          ) : (
+            <p className="mt-1 text-xs text-muted">{t("Optional. Paste an image link.", "اختياري. الصق رابط صورة.")}</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -362,6 +423,9 @@ function AddProduct({ onDone }: { onDone: () => void }) {
             <Input id="th2" inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value.replace(/[^\d]/g, ""))} />
           </div>
         </div>
+        {discount.trim() !== "" && price.trim() === "" && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">{t("A discount needs a price to apply to.", "الخصم يحتاج إلى سعر لتطبيقه.")}</p>
+        )}
         {msg && <p className="text-sm text-rose-600 dark:text-rose-400">{msg}</p>}
       </div>
       <div className="border-t border-border p-4">

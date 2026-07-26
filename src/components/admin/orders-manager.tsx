@@ -26,9 +26,19 @@ export interface AdminOrder {
   deliveryFee: number | null;
   trackingNote: string | null;
   adminNotes: string | null;
+  paymentMethod: string;
+  paymentStatus: string;
+  subtotalOmr: number;
+  totalOmr: number;
   createdAt: string;
   items: { nameEn: string; unitEn: string; quantity: number }[];
 }
+
+const PAYMENT_LABEL: Record<string, { en: string; ar: string }> = {
+  cod: { en: "Cash on Delivery", ar: "الدفع عند الاستلام" },
+  card: { en: "Card", ar: "بطاقة" },
+  applepay: { en: "Apple Pay", ar: "Apple Pay" },
+};
 
 const branchName = (id: string) => branches.find((b) => b.id === id)?.nameEn ?? id;
 
@@ -83,6 +93,7 @@ export function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 <th className="px-4 py-3 text-start font-medium">{t("Customer", "العميل")}</th>
                 <th className="hidden px-4 py-3 text-start font-medium md:table-cell">{t("Location", "الموقع")}</th>
                 <th className="hidden px-4 py-3 text-start font-medium sm:table-cell">{t("Items", "المنتجات")}</th>
+                <th className="hidden px-4 py-3 text-end font-medium sm:table-cell">{t("Total", "الإجمالي")}</th>
                 <th className="px-4 py-3 text-start font-medium">{t("Status", "الحالة")}</th>
                 <th className="hidden px-4 py-3 text-start font-medium lg:table-cell">{t("Date", "التاريخ")}</th>
               </tr>
@@ -97,10 +108,25 @@ export function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                   </td>
                   <td className="hidden px-4 py-3 text-muted md:table-cell">{o.governorateEn}, {o.wilayatEn}</td>
                   <td className="hidden px-4 py-3 sm:table-cell">{o.items.reduce((n, i) => n + i.quantity, 0)}</td>
+                  <td className="hidden px-4 py-3 text-end font-mono tabular-nums sm:table-cell">
+                    {o.totalOmr > 0 ? o.totalOmr.toFixed(3) : <span className="text-muted">—</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1", STATUS_STYLE[o.status as OrderStatus] ?? STATUS_STYLE.pending)}>
                       {t(STATUS_LABEL[o.status as OrderStatus]?.en ?? o.status, STATUS_LABEL[o.status as OrderStatus]?.ar ?? o.status)}
                     </span>
+                    {o.totalOmr > 0 && (
+                      <span
+                        className={cn(
+                          "ms-1.5 inline-flex rounded-full px-2 py-0.5 text-[0.6875rem] font-medium",
+                          o.paymentStatus === "paid"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-surface-2 text-muted",
+                        )}
+                      >
+                        {o.paymentStatus === "paid" ? t("Paid", "مدفوع") : t("Unpaid", "غير مدفوع")}
+                      </span>
+                    )}
                   </td>
                   <td className="hidden px-4 py-3 text-muted lg:table-cell">{new Date(o.createdAt).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}</td>
                 </tr>
@@ -167,6 +193,23 @@ function OrderDetail({ order, onSaved }: { order: AdminOrder; onSaved: () => voi
           <p className="mt-1 flex items-center gap-1.5 text-muted" dir="ltr"><Phone className="h-3.5 w-3.5" /> +968 {order.phone}</p>
           <p className="mt-1 flex items-center gap-1.5 text-muted"><MapPin className="h-3.5 w-3.5" /> {order.governorateEn}, {order.wilayatEn} · {branchName(order.branchId)}</p>
         </div>
+
+        {order.totalOmr > 0 && (
+          <div className="rounded-2xl border border-border p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">{t("Payment", "الدفع")}</span>
+              <span className={cn("rounded-full px-2 py-0.5 text-[0.6875rem] font-medium", order.paymentStatus === "paid" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-surface-2 text-muted")}>
+                {order.paymentStatus === "paid" ? t("Paid", "مدفوع") : t("Unpaid", "غير مدفوع")}
+              </span>
+            </div>
+            <p className="mt-2 text-muted">{t(PAYMENT_LABEL[order.paymentMethod]?.en ?? order.paymentMethod, PAYMENT_LABEL[order.paymentMethod]?.ar ?? order.paymentMethod)}</p>
+            <div className="mt-3 space-y-1 border-t border-border pt-3 font-mono tabular-nums">
+              <div className="flex justify-between text-muted"><span>{t("Subtotal", "المجموع الفرعي")}</span><span>{order.subtotalOmr.toFixed(3)}</span></div>
+              <div className="flex justify-between text-muted"><span>{t("Delivery", "التوصيل")}</span><span>{(order.deliveryFee ?? 0).toFixed(3)}</span></div>
+              <div className="flex justify-between font-semibold text-fg"><span>{t("Total", "الإجمالي")}</span><span>{order.totalOmr.toFixed(3)} {t("OMR", "ر.ع")}</span></div>
+            </div>
+          </div>
+        )}
 
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t("Items", "المنتجات")}</h3>

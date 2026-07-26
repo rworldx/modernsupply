@@ -44,6 +44,7 @@ export default async function AdminInventoryPage() {
       categoryNameAr,
       unitEn: p.unitEn,
       priceOmr: p.priceOmr,
+      imageUrl: p.imageUrl,
       stock: p.stock,
       lowStockThreshold: p.lowStockThreshold,
       active: p.active,

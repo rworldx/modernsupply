@@ -12,6 +12,8 @@ export interface CatalogProduct {
   stock: number;
   lowStockThreshold: number;
   active: boolean;
+  /** Product photo URL; null falls back to the category glyph. */
+  imageUrl: string | null;
   /** Original price in OMR; null when no price has been set. */
   priceOmr: number | null;
   /** Price after the best applicable discount; equals priceOmr when none. */

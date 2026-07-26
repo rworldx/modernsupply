@@ -28,6 +28,10 @@ export default async function AdminOrdersPage() {
     deliveryFee: o.deliveryFee,
     trackingNote: o.trackingNote,
     adminNotes: o.adminNotes,
+    paymentMethod: o.paymentMethod,
+    paymentStatus: o.paymentStatus,
+    subtotalOmr: o.subtotalOmr,
+    totalOmr: o.totalOmr,
     createdAt: o.createdAt.toISOString(),
     items: o.items.map((i) => ({ nameEn: i.nameEn, unitEn: i.unitEn, quantity: i.quantity })),
   }));

@@ -43,15 +43,30 @@ export function ProductCard({ product, index = 0 }: { product: CatalogProduct; i
       {/* One neutral tile per product until real photography exists. The icon is
           the category signal; the name does the rest. */}
       <div className="relative aspect-square overflow-hidden rounded-[var(--radius-lg)] bg-surface">
-        <div className="absolute inset-0 grid place-items-center">
-          <CategoryGlyph
-            categoryId={product.categoryId}
+        {product.imageUrl ? (
+          // Real photo when the admin has set one. Plain <img> because URLs come
+          // from arbitrary hosts the admin pastes, which next/image can't whitelist.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.imageUrl}
+            alt={t(product.nameEn, product.nameAr)}
+            loading="lazy"
             className={cn(
-              "size-20 transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-[1.05]",
-              soldOut ? "text-muted/25" : "text-muted/45",
+              "absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-[1.04]",
+              soldOut && "opacity-60",
             )}
           />
-        </div>
+        ) : (
+          <div className="absolute inset-0 grid place-items-center">
+            <CategoryGlyph
+              categoryId={product.categoryId}
+              className={cn(
+                "size-20 transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-[1.05]",
+                soldOut ? "text-muted/25" : "text-muted/45",
+              )}
+            />
+          </div>
+        )}
         {/* One discount marker per tile, in the bronze accent — the same single
             accent the rest of the site uses, so a grid on sale stays on-system
             instead of turning into red pills. */}

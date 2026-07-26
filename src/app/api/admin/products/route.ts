@@ -12,10 +12,14 @@ const schema = z.object({
   // admin supplies it on create rather than inheriting one size per category.
   unitEn: z.string().trim().max(60).default(""),
   unitAr: z.string().trim().max(60).default(""),
+  imageUrl: z.string().trim().url().max(2000).nullable().default(null),
   stock: z.number().int().min(0).default(0),
   lowStockThreshold: z.number().int().min(0).max(100000).default(10),
   // OMR. Null = no price yet, which the storefront renders as no price at all.
   priceOmr: z.number().min(0).max(100000).nullable().default(null),
+  // Optional launch discount for this one product (creates a product-scoped
+  // Discount row). 0/absent = none.
+  discountPercent: z.number().int().min(0).max(90).default(0),
 });
 
 function slugify(s: string) {
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
   }
-  const { categoryId, nameEn, nameAr, unitEn, unitAr, stock, lowStockThreshold, priceOmr } =
+  const { categoryId, nameEn, nameAr, unitEn, unitAr, imageUrl, stock, lowStockThreshold, priceOmr, discountPercent } =
     parsed.data;
 
   const cat = categories.find((c) => c.id === categoryId);
@@ -60,6 +64,7 @@ export async function POST(request: Request) {
       nameAr,
       unitEn,
       unitAr,
+      imageUrl,
       priceOmr,
       stock,
       lowStockThreshold,
@@ -68,6 +73,12 @@ export async function POST(request: Request) {
   });
   if (stock > 0) {
     await db.stockMovement.create({ data: { productId: id, delta: stock, reason: "manual", note: "created" } });
+  }
+  // A launch discount only makes sense with a price to reduce.
+  if (discountPercent > 0 && priceOmr != null) {
+    await db.discount.create({
+      data: { scope: "product", targetId: id, percentOff: discountPercent, active: true },
+    });
   }
 
   return NextResponse.json({ ok: true, id: created.id }, { status: 201 });

@@ -35,6 +35,7 @@ export async function getBrandCatalog(brandId: string): Promise<{
       stock: r.stock,
       lowStockThreshold: r.lowStockThreshold,
       active: r.active,
+      imageUrl: r.imageUrl,
       priceOmr: pricing.base,
       finalOmr: pricing.final,
       percentOff: pricing.percentOff,

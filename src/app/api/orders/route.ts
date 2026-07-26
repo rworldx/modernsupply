@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { quoteOrder } from "@/lib/order-total";
 
 const schema = z.object({
   firstName: z.string().trim().min(1).max(60),
@@ -12,6 +13,7 @@ const schema = z.object({
   wilayatEn: z.string().min(1),
   wilayatAr: z.string().min(1),
   branchId: z.string().min(1),
+  paymentMethod: z.enum(["cod", "card", "applepay"]).default("cod"),
   items: z
     .array(z.object({ id: z.string().min(1), quantity: z.number().int().min(1).max(999) }))
     .min(1),
@@ -47,25 +49,22 @@ export async function POST(request: Request) {
   }
   const data = parsed.data;
 
+  // Card / Apple Pay need a payment gateway that isn't wired in yet. Fail clearly
+  // rather than silently recording an unpaid "card" order. COD is fully live.
+  if (data.paymentMethod !== "cod") {
+    return NextResponse.json(
+      {
+        error: "online_payment_unavailable",
+        message: "Card and Apple Pay are not available yet. Please choose Cash on Delivery.",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
     const result = await db.$transaction(async (tx) => {
-      // Load products & verify availability.
-      const ids = data.items.map((i) => i.id);
-      const rows = await tx.product.findMany({ where: { id: { in: ids } } });
-      const byId = new Map(rows.map((r) => [r.id, r]));
-
-      const shortages: { id: string; nameEn: string; available: number; requested: number }[] = [];
-      for (const item of data.items) {
-        const p = byId.get(item.id);
-        if (!p || !p.active) {
-          shortages.push({ id: item.id, nameEn: p?.nameEn ?? item.id, available: 0, requested: item.quantity });
-        } else if (p.stock < item.quantity) {
-          shortages.push({ id: item.id, nameEn: p.nameEn, available: p.stock, requested: item.quantity });
-        }
-      }
-      if (shortages.length > 0) {
-        return { shortages } as const;
-      }
+      const quote = await quoteOrder(tx, { items: data.items, governorateEn: data.governorateEn });
+      if ("kind" in quote) return { ok: false as const, quoteError: quote };
 
       const orderNumber = await nextOrderNumber(tx);
 
@@ -80,46 +79,75 @@ export async function POST(request: Request) {
           wilayatEn: data.wilayatEn,
           wilayatAr: data.wilayatAr,
           branchId: data.branchId,
+          paymentMethod: "cod",
+          paymentStatus: "unpaid", // collected on delivery
+          subtotalOmr: quote.subtotalOmr,
+          deliveryFee: quote.deliveryFeeOmr,
+          totalOmr: quote.totalOmr,
           items: {
-            create: data.items.map((i) => {
-              const p = byId.get(i.id)!;
-              return {
-                productId: p.id,
-                nameEn: p.nameEn,
-                nameAr: p.nameAr,
-                unitEn: p.unitEn,
-                unitAr: p.unitAr,
-                quantity: i.quantity,
-              };
-            }),
+            create: quote.lines.map((l) => ({
+              productId: l.id,
+              nameEn: l.nameEn,
+              nameAr: l.nameAr,
+              unitEn: l.unitEn,
+              unitAr: l.unitAr,
+              quantity: l.quantity,
+              unitPriceOmr: l.unitPriceOmr,
+              lineTotalOmr: l.lineTotalOmr,
+            })),
           },
         },
         include: { items: true },
       });
 
       // Decrement stock + audit log.
-      for (const i of data.items) {
-        await tx.product.update({
-          where: { id: i.id },
-          data: { stock: { decrement: i.quantity } },
-        });
+      for (const l of quote.lines) {
+        await tx.product.update({ where: { id: l.id }, data: { stock: { decrement: l.quantity } } });
         await tx.stockMovement.create({
-          data: { productId: i.id, delta: -i.quantity, reason: "order", note: orderNumber },
+          data: { productId: l.id, delta: -l.quantity, reason: "order", note: orderNumber },
         });
       }
 
-      return { order } as const;
+      return { ok: true as const, order };
+    }, {
+      // The quote does a few reads (products, discounts, delivery zone) and the
+      // write decrements stock per line — over a remote database that can exceed
+      // the default 5s interactive-transaction window, so give it more room.
+      timeout: 20000,
+      maxWait: 10000,
     });
 
-    if ("shortages" in result) {
+    if (!result.ok) {
+      const q = result.quoteError;
+      if (q.kind === "shortage") {
+        return NextResponse.json(
+          { error: "Some items are no longer available in the requested quantity.", shortages: q.shortages },
+          { status: 409 },
+        );
+      }
+      if (q.kind === "unpriced") {
+        return NextResponse.json(
+          { error: "Some items don't have a price yet. Please contact a branch to order them.", items: q.items },
+          { status: 409 },
+        );
+      }
+      // no_delivery_zone
       return NextResponse.json(
-        { error: "Some items are no longer available in the requested quantity.", shortages: result.shortages },
+        {
+          error: "We don't deliver online to that governorate yet. Please order via a branch.",
+          governorateEn: q.governorateEn,
+        },
         { status: 409 },
       );
     }
 
     return NextResponse.json(
-      { orderNumber: result.order.orderNumber, id: result.order.id },
+      {
+        orderNumber: result.order.orderNumber,
+        id: result.order.id,
+        totalOmr: result.order.totalOmr,
+        paymentMethod: result.order.paymentMethod,
+      },
       { status: 201 },
     );
   } catch (e) {

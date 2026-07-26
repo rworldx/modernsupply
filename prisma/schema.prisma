@@ -27,6 +27,7 @@ model Product {
   unitEn            String
   unitAr            String
   priceOmr          Float? // base price in OMR; null = no price yet (storefront shows none)
+  imageUrl          String? // product photo URL; null = fall back to the category glyph
   stock             Int         @default(0)
   lowStockThreshold Int         @default(10)
   active            Boolean     @default(true) // false = delisted / discontinued (hidden from customers)
@@ -74,29 +75,57 @@ model Order {
   branchId        String // fulfilling branch (from src/data/brand.ts)
   status          String      @default("pending") // pending|confirmed|preparing|out_for_delivery|delivered|cancelled
   deliveryCompany String?
-  deliveryFee     Float? // OMR, set by admin
+  deliveryFee     Float? // OMR — the delivery fee actually charged (from the governorate zone at checkout; admin may adjust)
   trackingNote    String? // free text shown to customer (e.g. "Driver: Ahmed, ETA 5pm")
   adminNotes      String? // internal, not shown to customer
+
+  // Payment. Money fields are computed server-side at checkout from live prices +
+  // discounts + the governorate delivery fee, never trusted from the client.
+  paymentMethod   String      @default("cod") // "cod" | "card" | "applepay"
+  paymentStatus   String      @default("unpaid") // "unpaid" | "paid" | "failed" | "refunded"
+  subtotalOmr     Float       @default(0) // sum of item line totals after discount
+  totalOmr        Float       @default(0) // subtotal + deliveryFee
+  paymentRef      String? // gateway reference / session id, once a gateway is wired in
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   items           OrderItem[]
 
   @@index([phone])
   @@index([status])
+  @@index([paymentStatus])
 }
 
-// Snapshot of a product at order time (names/units frozen so history is stable).
+// Delivery fee per Oman governorate, set by the admin. Absent/inactive = the
+// governorate has no online delivery price yet (checkout blocks card/Apple Pay
+// for it and falls back to "confirmed by branch"). Keyed by the English
+// governorate name from src/data/wilayats.ts.
+model DeliveryZone {
+  id            String   @id @default(cuid())
+  governorateEn String   @unique
+  governorateAr String
+  feeOmr        Float // OMR, >= 0 (0 = free delivery for this governorate)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Snapshot of a product at order time: names, units, AND the unit price charged
+// (after discount) are frozen so the order total stays stable even as catalogue
+// prices or discounts change later.
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  nameEn    String
-  nameAr    String
-  unitEn    String
-  unitAr    String
-  quantity  Int
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  nameEn       String
+  nameAr       String
+  unitEn       String
+  unitAr       String
+  quantity     Int
+  unitPriceOmr Float   @default(0) // charged unit price after discount, frozen
+  lineTotalOmr Float   @default(0) // unitPriceOmr * quantity
 
   @@index([orderId])
 }
